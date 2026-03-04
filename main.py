@@ -1,15 +1,15 @@
 ﻿import requests
-from datetime import time
+from datetime import datetime, timedelta
 from itertools import zip_longest
 from src.bus_data.models import Arrival
 
-import json
+# import json
 
 res = requests.get("http://localhost:7341/api/v1/arrivals?stop=5128&stop=2057")
 res.raise_for_status()
 
 data = res.json()
-print(json.dumps(data, indent=2))
+# print(json.dumps(data, indent=2))
 
 e1_stop = []
 e2_stop = []
@@ -31,20 +31,31 @@ for stop_id, stop_info in data.items():
             stop_name=stop_name,
         )
         if arrival.route == "133":
-            print("skipping")
             continue
         if arrival.stop_id == "5128":
             e1_stop.append(arrival)
         elif arrival.stop_id == "2057":
             e2_stop.append(arrival)
 
+
 # sort by arrival time
 e1_stop.sort(key=lambda x: x.minutes_until)
 e2_stop.sort(key=lambda x: x.minutes_until)
 
 
+def filter_future_buses(bus_list):
+    return [bus for bus in bus_list if 0 <= bus.minutes_until <= 240]
+
+
+e1_stop = filter_future_buses(e1_stop)
+e2_stop = filter_future_buses(e2_stop)
+
+if not e1_stop and not e2_stop:
+    print("No buses arriving in the next 4 hours")
+    input("press <Enter> to exit...")
+    exit()
+
 print("-----------------------------------------------------------")
-# First, find the longest string to determine column width
 all_texts = []
 temp_list = []
 for e1, e2 in zip_longest(e1_stop, e2_stop, fillvalue=None):
@@ -63,11 +74,12 @@ for e1, e2 in zip_longest(e1_stop, e2_stop, fillvalue=None):
     temp_list.append((e1_text, e2_text))
     all_texts.extend([e1_text, e2_text])
 
-max_width = max(len(text) for text in all_texts) + 2  # Add padding
+if all_texts:
+    max_width = max(len(text) for text in all_texts) + 2  # Add padding
 
-# Now print with dynamic width
-for e1_text, e2_text in temp_list:
-    print(f"{e1_text:<{max_width}} | {e2_text:<{max_width}}")
-
+    for e1_text, e2_text in temp_list:
+        print(f"{e1_text:<{max_width}} | {e2_text:<{max_width}}")
+else:
+    print("No matching buses to display")
 
 input("press <Enter> to exit...")
